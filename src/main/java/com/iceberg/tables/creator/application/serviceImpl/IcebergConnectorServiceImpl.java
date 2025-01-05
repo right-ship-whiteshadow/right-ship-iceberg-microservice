@@ -321,7 +321,8 @@ public class IcebergConnectorServiceImpl implements IcebergConnectorService {
         loadTable(TableIdentifier.of(database, table));
         return "ICEBERG";
     }
-    
+
+	 
     /*
     
     public String writeTable(String records, String outputFile) throws Exception {
@@ -422,30 +423,300 @@ public class IcebergConnectorServiceImpl implements IcebergConnectorService {
         
         return  new S3FileIO(supplier);
     }
-    */
     
-    //TBD
+    
+    public S3FileIO initS3FileIO() {
+        AwsBasicCredentials awsCreds = AwsBasicCredentials.create(
+                creds.getValue("AWS_ACCESS_KEY_ID"),
+                creds.getValue("AWS_SECRET_ACCESS_KEY"));
+
+        SdkHttpClient client = ApacheHttpClient.builder()
+                .maxConnections(100)
+                .build();
+        
+        SerializableSupplier<S3Client> supplier = () -> { 
+            S3ClientBuilder clientBuilder = S3Client.builder()
+                .region(Region.of(creds.getValue("AWS_REGION")))
+                .credentialsProvider(StaticCredentialsProvider.create(awsCreds))
+                .httpClient(client);
+            String uri = creds.getValue("ENDPOINT");
+            if (uri != null) {
+                clientBuilder.endpointOverride(URI.create(uri));
+            }
+            return clientBuilder.build();
+        };
+        
+        return  new S3FileIO(supplier);
+    }
+    
     public String writeTable(String records, String outputFile) throws Exception {
-    	return null;
+        if (iceberg_table == null)
+            loadTable();
+        
+        System.out.println("Writing to the table " + m_tableIdentifier);
+        
+        // Check if outFilePath or name is passed by the user
+        if (outputFile == null) {
+            outputFile = String.format("%s/icebergdata-%s.parquet", getTableDataLocation(), UUID.randomUUID());
+        }
+        
+        JSONObject result = new JSONObject();
+        JSONArray files = new JSONArray();
+        
+        Schema schema = iceberg_table.schema();
+        ImmutableList.Builder<Record> builder = ImmutableList.builder();
+        
+        JSONArray listOfRecords = new JSONObject(records).getJSONArray("records");
+        for (int index = 0; index < listOfRecords.length(); ++index) {
+            JSONObject fields = listOfRecords.getJSONObject(index);
+            List<Types.NestedField> columns = schema.columns();
+            String[] fieldNames = JSONObject.getNames(fields);
+            // Verify if input columns are the same number as the required fields
+            // Optional fields shouldn't be part of the check
+            if (fieldNames.length > columns.size()) 
+                throw new IllegalArgumentException("Number of fields in the record doesn't match the number of required columns in schema.\n");
+            
+            Record genericRecord = GenericRecord.create(schema);
+            for (Types.NestedField col : columns) {
+                String colName = col.name();
+                Type colType = col.type();
+                // Validate that a required field is present in the record
+                if (!fields.has(colName)) {
+                    if (col.isRequired())
+                        throw new IllegalArgumentException("Record is missing a required field: " + colName);
+                    else
+                        continue;
+                }
+                
+                // Trim the input value
+                String value = fields.get(colName).toString().trim();
+
+                // Check for null values
+                if (col.isRequired() && value.equalsIgnoreCase("null"))
+                    throw new IllegalArgumentException("Required field cannot be null: " + colName);
+
+                // Store the value as an iceberg data type
+                genericRecord.setField(colName, DataConversion.stringToIcebergType(value, colType));
+            }
+            builder.add(genericRecord.copy());
+        }
+        
+        S3FileIO io = null;
+        FileAppender<Record> appender = null;
+        try {
+        io = initS3FileIO();
+        OutputFile location = io.newOutputFile(outputFile);
+        System.out.println("New file created at: " + location);
+                    
+        appender = Parquet.write(location)
+                        .schema(schema)
+                        .createWriterFunc(GenericParquetWriter::buildWriter)
+                        .build();
+        appender.addAll(builder.build());
+        } finally {
+            if (io != null)
+                io.close();
+            if (appender != null)
+                appender.close();
+        }
+        
+        // Add file info to the JSON object
+        JSONObject file = new JSONObject();
+        file.put("file_path", outputFile);
+        file.put("file_format", FileFormat.fromFileName(outputFile));
+        file.put("file_size_in_bytes", appender.length());
+        file.put("record_count", listOfRecords.length());
+        files.put(file);
+        
+        result.put("files", files);
+                
+        return result.toString();
+    }
+    
+    String getJsonStringOrDefault(JSONObject o, String key, String defVal) {
+    	try {
+    		return o.getString(key);
+    	} catch (JSONException e) {
+    		return defVal;
+    	}
+    }
+    
+    Long getJsonLongOrDefault(JSONObject o, String key, Long defVal) {
+    	try {
+    		return o.getLong(key);
+    	} catch (JSONException e) {
+    		return defVal;
+    	}
+    }
+    
+    DataFile getDataFile(S3FileIO io, String filePath, String fileFormatStr, Long fileSize, Long numRecords) throws Exception {
+        PartitionSpec ps = iceberg_table.spec();
+        OutputFile outputFile = io.newOutputFile(filePath);
+
+        if(fileFormatStr == null) {
+            // if file format is not provided, we'll try to infer from the file extension (if any)
+            String fileLocation = outputFile.location();
+            if(fileLocation.contains("."))
+                fileFormatStr = fileLocation.substring(fileLocation.lastIndexOf('.') + 1, fileLocation.length());
+            else
+                fileFormatStr = "";
+        }
+        
+        FileFormat fileFormat = null;
+        if(fileFormatStr.isEmpty())
+            throw new Exception("Unable to infer the file format of the file to be committed: " + outputFile.location());
+        else if(fileFormatStr.toLowerCase().equals("parquet"))
+            fileFormat = FileFormat.PARQUET;
+        else
+            throw new Exception("Unsupported file format " + fileFormatStr + " cannot be committed: " + outputFile.location());
+        
+        if(fileSize == null) {
+            try {
+                FileSystem fs = FileSystem.get(new URI(outputFile.location()), m_catalog.getConf());
+                FileStatus fstatus = fs.getFileStatus(new Path(outputFile.location()));
+                fileSize = fstatus.getLen();
+            } catch (Exception e) {
+                throw new Exception("Unable to infer the filesize of the file to be committed: " + outputFile.location());
+            }
+        }
+            
+        if (numRecords == null) {
+            try {
+                 Class<?> pifClass = Class.forName("org.apache.iceberg.parquet.ParquetIO");
+                Constructor<?> pifCstr =pifClass.getDeclaredConstructor();
+                pifCstr.setAccessible(true);
+                Object pifInst = pifCstr.newInstance();
+                Method pifMthd = pifClass.getDeclaredMethod("file", org.apache.iceberg.io.InputFile.class);
+                pifMthd.setAccessible(true);
+                org.apache.iceberg.io.InputFile pif = io.newInputFile(outputFile.location());
+                Object parquetInputFile = pifMthd.invoke(pifInst, pif);
+            
+                ParquetFileReader reader = ParquetFileReader.open((InputFile) parquetInputFile);
+                numRecords = reader.getRecordCount();
+            } catch (Exception e) {
+                throw new Exception("Unable to infer the number of records of the file to be committed: " + outputFile.location());
+            }
+        }
+
+        DataFile data = DataFiles.builder(ps)
+                .withPath(outputFile.location())
+                .withFormat(fileFormat)
+                .withFileSizeInBytes(fileSize)
+                .withRecordCount(numRecords)
+                .build();
+
+        return data;
     }
 
-	// TBD
-	@Override
-	public boolean commitTable(String dataFileName) throws Exception {
-		return false;
-	}
+    Set<DataFile> getDataFileSet(S3FileIO io, JSONArray files) throws Exception {
+        Set<DataFile> dataFiles = new HashSet<DataFile>();
 
-	// TBD
-	@Override
-	public boolean rewriteFiles(String dataFileName) throws Exception {
-		return false;
-	}
+        for (int index = 0; index < files.length(); ++index) {
+            JSONObject file = files.getJSONObject(index);
+            // Required
+            String filePath = file.getString("file_path");
 
-	//TBD
-	@Override
-	public boolean alterTable(String newSchema) throws Exception {
-		return false;
-	}
+            // Optional (but slower if not given)
+            String fileFormatStr = getJsonStringOrDefault(file, "file_format", null);
+            Long fileSize = getJsonLongOrDefault(file, "file_size_in_bytes", null);
+            Long numRecords = getJsonLongOrDefault(file, "record_count", null);
+            
+            try {
+                dataFiles.add(getDataFile(
+                    io,
+                    filePath,
+                    fileFormatStr,
+                    fileSize,
+                    numRecords));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            } 
+        }
+        return dataFiles;
+    }
 
+    public boolean commitTable(String dataFiles) throws Exception {
+        if (iceberg_table == null)
+            loadTable();
+        
+        System.out.println("Commiting to the Iceberg table");
+        
+        S3FileIO io = null;
+        try {
+            io = initS3FileIO();
+            
+            JSONArray files = new JSONObject(dataFiles).getJSONArray("files");
+            Transaction transaction = iceberg_table.newTransaction();
+            AppendFiles append = transaction.newAppend();
+            // Commit data files
+            System.out.println("Starting Txn");
+            for (int index = 0; index < files.length(); ++index) {
+                JSONObject file = files.getJSONObject(index);
+                // Required
+                String filePath = file.getString("file_path");
+    
+                // Optional (but slower if not given)
+                String fileFormatStr = getJsonStringOrDefault(file, "file_format", null);
+                Long fileSize = getJsonLongOrDefault(file, "file_size_in_bytes", null);
+                Long numRecords = getJsonLongOrDefault(file, "record_count", null);
+                
+                append.appendFile(getDataFile(
+                    io,
+                    filePath,
+                    fileFormatStr,
+                    fileSize,
+                    numRecords));
+            }
+            append.commit();
+            transaction.commitTransaction();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        } finally {
+            if (io != null)
+                io.close();
+        }
+        
+        System.out.println("Txn Complete!");
+        
+        return true;
+    }
+
+    public boolean rewriteFiles(String dataFiles) throws Exception {
+        if (iceberg_table == null)
+            loadTable();
+        
+        System.out.println("Rewriting files in the Iceberg table");
+        
+        S3FileIO io = null;
+        
+        Set<DataFile> oldDataFiles = new HashSet<DataFile>();
+        Set<DataFile> newDataFiles = new HashSet<DataFile>();
+
+        try {
+            io = initS3FileIO();
+            
+            oldDataFiles = getDataFileSet(io, new JSONObject(dataFiles).getJSONArray("files_to_del"));
+            newDataFiles = getDataFileSet(io, new JSONObject(dataFiles).getJSONArray("files_to_add")); 
+
+            Transaction transaction = iceberg_table.newTransaction();
+            RewriteFiles rewrite = transaction.newRewrite();
+    
+            // Rewrite data files
+            System.out.println("Starting Txn");
+            rewrite.rewriteFiles(oldDataFiles, newDataFiles);
+            rewrite.commit();
+            transaction.commitTransaction();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        } finally {
+            if (io != null)
+                io.close();
+        }
+        
+        System.out.println("Txn Complete!");
+
+        return true;
+    }
+    */
     
 }

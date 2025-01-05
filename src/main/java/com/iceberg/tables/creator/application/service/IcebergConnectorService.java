@@ -30,7 +30,7 @@ public interface IcebergConnectorService {
 
     boolean createTable(Schema schema, PartitionSpec spec, boolean overwrite) throws Exception;
 
-    boolean alterTable(String newSchema) throws Exception;
+    //boolean alterTable(String newSchema) throws Exception;
 
     boolean dropTable() throws Exception;
 
@@ -46,12 +46,14 @@ public interface IcebergConnectorService {
 
     Iterable<Snapshot> getListOfSnapshots() throws Exception;
 
-    String writeTable(String record, String outputFile) throws Exception, UnsupportedEncodingException;
-
-    boolean commitTable(String dataFileName) throws Exception;
-
-    boolean rewriteFiles(String dataFileName) throws Exception;
-
+	/*
+	 * String writeTable(String record, String outputFile) throws Exception,
+	 * UnsupportedEncodingException;
+	 * 
+	 * boolean commitTable(String dataFileName) throws Exception;
+	 * 
+	 * boolean rewriteFiles(String dataFileName) throws Exception;
+	 */
     Schema getTableSchema();
 
     List<Namespace> listNamespaces() throws Exception;
