@@ -26,7 +26,7 @@ public class IcebergCustomCatalogDeserializer extends StdDeserializer<IcebergCus
     public IcebergCustomGlueCatalog deserialize(JsonParser p, DeserializationContext context) throws IOException, JacksonException {
         JsonNode node = p.getCodec().readTree(p);
         String name = node.get("name").asText();
-        IcebergCustomCatalogType type = IcebergCustomCatalogType.valueOf(node.get("type").asText());
+        IcebergCatalogType type = IcebergCatalogType.valueOf(node.get("type").asText());
         String metastoreUri = node.get("metastoreUri").asText();
         ObjectMapper mapper = new ObjectMapper();
         Map<String, String> properties = mapper.convertValue(node.get("properties"), new TypeReference<Map<String, String>>(){});
@@ -36,7 +36,7 @@ public class IcebergCustomCatalogDeserializer extends StdDeserializer<IcebergCus
             catalogConf.set(entry.getKey(), entry.getValue());
         }
 
-        return new IcebergCustomGlueCatalog(name, type, metastoreUri, properties, catalogConf);
+        return new IcebergCustomGlueCatalog(name, properties, catalogConf);
     }
 
 }

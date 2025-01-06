@@ -45,6 +45,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.google.common.collect.ImmutableList;
@@ -60,9 +61,11 @@ import jakarta.annotation.PostConstruct;
 @Service
 public class IcebergConnectorServiceImpl implements IcebergConnectorService {
 
+    @Autowired
+    private IcebergCustomGlueCatalog customGlueCatalog;
+
     private Long snapshotId = null;
     private String scanFilter = null;
-    private IcebergCustomGlueCatalog customGlueCatalog;
     private TableIdentifier tableIdentifier;
     private AWSCredentials credentials;
     private Table icebergTable;
@@ -71,45 +74,53 @@ public class IcebergConnectorServiceImpl implements IcebergConnectorService {
     private final static String IO_MANIFEST_CACHE_EXPIRATION_INTERVAL_MS_DEFAULT = "0";
 
     private static Logger log = LogManager.getLogger(IcebergConnectorServiceImpl.class);
-    
-    public IcebergConnectorServiceImpl(IcebergCustomGlueCatalog customGlueCatalog, String namespace, 
-    		String tableName, AWSCredentials creds) throws IOException {
-    	this.customGlueCatalog = customGlueCatalog;
-    	this.credentials = creds;
-        if (StringUtils.isNotBlank(tableName)) {
-        	setTableIdentifier(namespace, tableName);
-        }
+
+    public IcebergConnectorServiceImpl() {
+        customGlueCatalog = new IcebergCustomGlueCatalog();
+        initialization();
     }
-    
-    @PostConstruct
+
+    public IcebergConnectorServiceImpl(IcebergCustomGlueCatalog customGlueCatalog, String namespace,
+                                       String tableName, AWSCredentials creds) throws IOException {
+        super();
+        this.customGlueCatalog = customGlueCatalog;
+        this.credentials = creds;
+        if (StringUtils.isNotBlank(tableName)) {
+            setTableIdentifier(namespace, tableName);
+        }
+        initialization();
+    }
+
     public void initialization() {
-    	Configuration conf = new Configuration();
-    	customGlueCatalog.setConf(conf);
-    	if (credentials != null) {
+        if (customGlueCatalog == null) {
+            customGlueCatalog = new IcebergCustomGlueCatalog();
+        }
+        Configuration conf = customGlueCatalog.getCatalogConfiguration();
+        if (credentials != null) {
             conf.set("fs.s3a.access.key", credentials.getAwsClientAccessKey());
             conf.set("fs.s3a.secret.key", credentials.getAwsClientSecretKey());
-            
+
             String endpoint = credentials.getAwsEndPoint();
-            if(endpoint != null) {
-            	conf.set("fs.s3a.endpoint", endpoint);
-            	conf.set("fs.s3a.path.style.access", "true");
+            if (endpoint != null) {
+                conf.set("fs.s3a.endpoint", endpoint);
+                conf.set("fs.s3a.path.style.access", "true");
             }
         }
-    	if (conf.get(IO_MANIFEST_CACHE_ENABLED) == null) {
+        if (conf.get(IO_MANIFEST_CACHE_ENABLED) == null) {
             conf.set(IO_MANIFEST_CACHE_ENABLED, IO_MANIFEST_CACHE_ENABLED_DEFAULT);
         }
         if (conf.get(IO_MANIFEST_CACHE_EXPIRATION_INTERVAL_MS) == null) {
             conf.set(IO_MANIFEST_CACHE_EXPIRATION_INTERVAL_MS, IO_MANIFEST_CACHE_EXPIRATION_INTERVAL_MS_DEFAULT);
         }
         customGlueCatalog.getProperties().put("list-all-tables", "true");
-                
+
         customGlueCatalog.initialize("Glue", customGlueCatalog.getProperties());
     }
-    
+
     public void setTableIdentifier(String namespace, String tableName) {
         tableIdentifier = TableIdentifier.of(namespace, tableName);
     }
-    
+
     public Table loadTable(TableIdentifier identifier) {
         if (!customGlueCatalog.tableExists(identifier)) {
             throw new TableNotFoundException("ERROR: Table " + identifier + " does not exist");
@@ -118,12 +129,12 @@ public class IcebergConnectorServiceImpl implements IcebergConnectorService {
         Table table = customGlueCatalog.loadTable(identifier);
         if (table == null)
             throw new TableNotLoaded("ERROR Loading table: " + identifier);
-        
+
         log.info(String.format("Table %s loaded successfully", table.name()));
-        
+
         return table;
     }
-    
+
     public void loadTable() {
         icebergTable = loadTable(tableIdentifier);
 
@@ -147,33 +158,33 @@ public class IcebergConnectorServiceImpl implements IcebergConnectorService {
             }
         }
     }
-    
+
     public boolean createTable(Schema schema, PartitionSpec spec, boolean overwrite) {
         if (customGlueCatalog.tableExists(tableIdentifier)) {
             if (overwrite) {
                 // To overwrite an existing table, drop it first
-            	customGlueCatalog.dropTable(tableIdentifier);
+                customGlueCatalog.dropTable(tableIdentifier);
             } else {
                 throw new RuntimeException("Table " + tableIdentifier + " already exists");
             }
         }
-        
+
         System.out.println("Creating table " + tableIdentifier);
         log.info(String.format("Creating table %s", tableIdentifier));
 
         Map<String, String> props = new HashMap<String, String>();
         customGlueCatalog.createTable(tableIdentifier, schema, spec, props);
-                
+
         System.out.println("Table created successfully");
         log.info(String.format("Table %s created successfully", tableIdentifier));
-        
+
         return true;
     }
-    
+
     public boolean dropTable() {
         if (icebergTable == null)
             loadTable();
-        
+
         System.out.println("Dropping the table " + tableIdentifier);
         log.info(String.format("Dropping table %s", tableIdentifier));
         if (customGlueCatalog.dropTable(tableIdentifier)) {
@@ -183,18 +194,18 @@ public class IcebergConnectorServiceImpl implements IcebergConnectorService {
         }
         return false;
     }
-    
+
     public List<List<String>> readTable() throws UnsupportedEncodingException {
         if (icebergTable == null)
             loadTable();
-        
+
         System.out.println("Records in " + tableIdentifier + " :");
         // Use specified snapshot, latest by default
         Long snapshotId = getCurrentSnapshotId();
         if (snapshotId == null)
             return new ArrayList<List<String>>();
         IcebergGenerics.ScanBuilder scanBuilder = IcebergGenerics.read(icebergTable);
-        if(scanFilter != null) {
+        if (scanFilter != null) {
             Expression filterExpr = ExpressionParser.fromJson(scanFilter);
             scanBuilder = scanBuilder.where(filterExpr).caseInsensitive();
         }
@@ -204,7 +215,7 @@ public class IcebergConnectorServiceImpl implements IcebergConnectorService {
         for (Record record : records) {
             int numFields = record.size();
             List<String> rec = new ArrayList<String>(numFields);
-            for(int x = 0; x < numFields; x++) {
+            for (int x = 0; x < numFields; x++) {
                 // A field can be optional, add a check for null values
                 Object value = record.get(x);
                 rec.add(value == null ? "null" : value.toString());
@@ -213,41 +224,41 @@ public class IcebergConnectorServiceImpl implements IcebergConnectorService {
         }
         return output;
     }
-    
+
     public List<String> listTables(String namespace) {
         List<TableIdentifier> tables = customGlueCatalog.listTables(Namespace.of(namespace));
         return tables.stream().map(TableIdentifier::name).toList();
     }
-    
+
     public java.util.List<Namespace> listNamespaces() {
         return customGlueCatalog.listNamespaces();
     }
-    
+
     public boolean createNamespace(Namespace namespace) throws AlreadyExistsException, UnsupportedOperationException {
-    	customGlueCatalog.createNamespace(namespace);
+        customGlueCatalog.createNamespace(namespace);
         System.out.println("Namespace " + namespace + " created");
         return true;
     }
-    
+
     public boolean dropNamespace(Namespace namespace) throws NamespaceNotEmptyException {
-        if(customGlueCatalog.dropNamespace(namespace)) {
+        if (customGlueCatalog.dropNamespace(namespace)) {
             System.out.println("Namespace " + namespace + " dropped");
             return true;
         }
         return false;
     }
-    
+
     public boolean renameTable(TableIdentifier from, TableIdentifier to) throws NoSuchTableException, AlreadyExistsException {
         customGlueCatalog.renameTable(from, to);
         System.out.println("Table " + from + " renamed to " + to);
-        
+
         return true;
     }
-    
-    public java.util.Map<java.lang.String,java.lang.String> loadNamespaceMetadata(Namespace namespace) throws NoSuchNamespaceException {
+
+    public java.util.Map<java.lang.String, java.lang.String> loadNamespaceMetadata(Namespace namespace) throws NoSuchNamespaceException {
         return customGlueCatalog.loadNamespaceMetadata(namespace);
     }
-    
+
     public String getTableLocation() {
         if (icebergTable == null)
             loadTable();
@@ -266,27 +277,27 @@ public class IcebergConnectorServiceImpl implements IcebergConnectorService {
             return dataLocation.substring(0, dataLocation.length() - 1);
         return dataLocation;
     }
-    
+
     public PartitionSpec getSpec() {
         if (icebergTable == null)
             loadTable();
         PartitionSpec spec = icebergTable.spec();
         return spec;
     }
-    
+
     public String getUUID() {
         if (icebergTable == null)
             loadTable();
         TableMetadata metadata = ((HasTableOperations) icebergTable).operations().current();
         return metadata.uuid();
     }
-         
+
     public Snapshot getCurrentSnapshot() {
         if (icebergTable == null)
             loadTable();
         return scan.snapshot();
     }
-    
+
     public Long getCurrentSnapshotId() {
         if (icebergTable == null)
             loadTable();
@@ -302,21 +313,21 @@ public class IcebergConnectorServiceImpl implements IcebergConnectorService {
         Iterable<Snapshot> snapshots = icebergTable.snapshots();
         return snapshots;
     }
-    
+
     public Schema getTableSchema() {
         if (icebergTable == null)
             loadTable();
         return scan.schema();
     }
-    
+
     public String getTableType() throws Exception {
         if (icebergTable == null) {
             loadTable();
         }
-        
+
         return "ICEBERG";
     }
-    
+
     public String getTableType(String database, String table) throws Exception {
         loadTable(TableIdentifier.of(database, table));
         return "ICEBERG";
@@ -718,5 +729,5 @@ public class IcebergConnectorServiceImpl implements IcebergConnectorService {
         return true;
     }
     */
-    
+
 }

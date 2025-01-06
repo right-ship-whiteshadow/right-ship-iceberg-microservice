@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: IcebergTablesCreatorMicroservice
+cloud:
+  aws:
+    region:
+      static: ap-south-1
+    stack:
+      auto: false
+ 
