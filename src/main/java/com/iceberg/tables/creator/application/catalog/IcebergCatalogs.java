@@ -5,25 +5,25 @@ import java.util.List;
 
 public class IcebergCatalogs {
 
-    List<IcebergCustomGlueCatalog> catalogs;
+    List<IcebergGlueCatalog> catalogs;
 
     public IcebergCatalogs() {
-        catalogs = new ArrayList<IcebergCustomGlueCatalog>();
+        catalogs = new ArrayList<IcebergGlueCatalog>();
     }
 
-    public void addCatalog(IcebergCustomGlueCatalog catalog) {
+    public void addCatalog(IcebergGlueCatalog catalog) {
         catalogs.add(catalog);
     }
 
-    public List<IcebergCustomGlueCatalog> getCatalogs() {
+    public List<IcebergGlueCatalog> getCatalogs() {
         return catalogs;
     }
 
-    public IcebergCustomGlueCatalog getCatalog(String catalogName, String metastoreUri) {
+    public IcebergGlueCatalog getCatalog(String catalogName, String metastoreUri) {
         if (catalogName == null || metastoreUri == null)
             return null;
 
-        for (IcebergCustomGlueCatalog catalog : catalogs) {
+        for (IcebergGlueCatalog catalog : catalogs) {
             if (catalog.getName().equalsIgnoreCase(catalogName) && catalog.getMetastoreUri().equalsIgnoreCase(metastoreUri)) {
                 return catalog;
             }
@@ -33,7 +33,7 @@ public class IcebergCatalogs {
 
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        for (IcebergCustomGlueCatalog catalog : catalogs) {
+        for (IcebergGlueCatalog catalog : catalogs) {
             sb.append(catalog);
             sb.append("\n");
         }

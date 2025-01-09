@@ -4,6 +4,7 @@ import java.util.*;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URISyntaxException;
+
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
@@ -14,9 +15,10 @@ import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 
-public interface IcebergConnectorService {
+public interface IcebergTablesAWSGLueDataService {
 
-
+    String IO_MANIFEST_CACHE_ENABLED_DEFAULT = "true";
+    String IO_MANIFEST_CACHE_EXPIRATION_INTERVAL_MS_DEFAULT = "0";
 
     void setTableIdentifier(String namespace, String tableName);
 
@@ -30,7 +32,7 @@ public interface IcebergConnectorService {
 
     boolean createTable(Schema schema, PartitionSpec spec, boolean overwrite) throws Exception;
 
-    //boolean alterTable(String newSchema) throws Exception;
+    boolean alterTable(String newSchema) throws Exception;
 
     boolean dropTable() throws Exception;
 
@@ -46,14 +48,12 @@ public interface IcebergConnectorService {
 
     Iterable<Snapshot> getListOfSnapshots() throws Exception;
 
-	/*
-	 * String writeTable(String record, String outputFile) throws Exception,
-	 * UnsupportedEncodingException;
-	 * 
-	 * boolean commitTable(String dataFileName) throws Exception;
-	 * 
-	 * boolean rewriteFiles(String dataFileName) throws Exception;
-	 */
+    String writeTable(String record, String outputFile) throws Exception;
+
+    boolean commitTable(String dataFileName) throws Exception;
+
+    boolean rewriteFiles(String dataFileName) throws Exception;
+
     Schema getTableSchema();
 
     List<Namespace> listNamespaces() throws Exception;
@@ -62,13 +62,13 @@ public interface IcebergConnectorService {
 
     boolean dropNamespace(Namespace namespace) throws Exception, NamespaceNotEmptyException;
 
-    java.util.Map<java.lang.String,java.lang.String> loadNamespaceMetadata(Namespace namespace) throws Exception, NoSuchNamespaceException;
+    java.util.Map<java.lang.String, java.lang.String> loadNamespaceMetadata(Namespace namespace) throws Exception, NoSuchNamespaceException;
 
     boolean renameTable(TableIdentifier from, TableIdentifier to) throws Exception, NoSuchTableException, AlreadyExistsException;
 
     PartitionSpec getSpec() throws Exception;
 
-    String getUUID()  throws Exception;
+    String getUUID() throws Exception;
 
 
 }

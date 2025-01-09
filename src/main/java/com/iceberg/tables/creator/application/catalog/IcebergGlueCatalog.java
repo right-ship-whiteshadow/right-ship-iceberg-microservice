@@ -2,16 +2,14 @@ package com.iceberg.tables.creator.application.catalog;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 
-import software.amazon.awssdk.awscore.client.config.AwsAdvancedClientOption;
-import software.amazon.awssdk.services.sts.model.Tag;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.iceberg.aws.AwsProperties;
 import org.apache.iceberg.aws.glue.GlueCatalog;
-import org.apache.iceberg.catalog.Catalog;
-import org.apache.iceberg.hadoop.HadoopCatalog;
+import org.apache.iceberg.aws.s3.S3FileIOProperties;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
@@ -19,32 +17,24 @@ import org.springframework.stereotype.Component;
 @Component
 @Scope("prototype")
 @JsonDeserialize(using = IcebergCustomCatalogDeserializer.class)
-public class IcebergCustomGlueCatalog extends GlueCatalog {
+public class IcebergGlueCatalog {
 
-	private String name;
+	private String catalogName = "Glue_".concat((new Random()).toString());
     private String metastoreUri;
-    private Map<String, String> properties;
-    private Configuration configuration;
-    
-    public IcebergCustomGlueCatalog() {
+    private Map<String, String> catalogProperties = new HashMap<>();
+    private Configuration hadoopConfiguration = new Configuration();
+	private AwsProperties awsProperties = new AwsProperties();
+	private S3FileIOProperties s3Properties;
+    private GlueCatalog glueCatalog;
+
+    public IcebergGlueCatalog() {
     	System.setProperty("aws.region", "us-west-2");
-    	this.name = "GLUE_".concat(UUID.randomUUID().toString());
-    	this.properties = new HashMap<>();
+    	this.catalogName = "GLUE_".concat(UUID.randomUUID().toString());
+    	this.catalogProperties = new HashMap<>();
 		this.configuration = new Configuration();
     	this.setConf(configuration);
     	this.initialize(name, properties);
     }
-
-	public IcebergCustomGlueCatalog(String name, Map<String, String> properties, Configuration configuration) {
-		super();
-		System.setProperty("aws.region", "us-west-2");
-		this.name = "GLUE_".concat(UUID.randomUUID().toString());
-		this.properties = properties;
-		this.configuration = configuration;
-		this.setConf(configuration);
-		//properties.put(AwsAdvancedClientOption.ENABLE_DEFAULT_REGION_DETECTION.toString(), "false");
-		this.initialize(name, properties);
-	}
 
     public String getName() {
 		return name;

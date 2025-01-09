@@ -12,7 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 
-public class IcebergCustomCatalogDeserializer extends StdDeserializer<IcebergCustomGlueCatalog> {
+public class IcebergCustomCatalogDeserializer extends StdDeserializer<IcebergGlueCatalog> {
 
     public IcebergCustomCatalogDeserializer() {
         this(null);
@@ -23,7 +23,7 @@ public class IcebergCustomCatalogDeserializer extends StdDeserializer<IcebergCus
     }
 
     @Override
-    public IcebergCustomGlueCatalog deserialize(JsonParser p, DeserializationContext context) throws IOException, JacksonException {
+    public IcebergGlueCatalog deserialize(JsonParser p, DeserializationContext context) throws IOException, JacksonException {
         JsonNode node = p.getCodec().readTree(p);
         String name = node.get("name").asText();
         IcebergCatalogType type = IcebergCatalogType.valueOf(node.get("type").asText());
@@ -36,7 +36,7 @@ public class IcebergCustomCatalogDeserializer extends StdDeserializer<IcebergCus
             catalogConf.set(entry.getKey(), entry.getValue());
         }
 
-        return new IcebergCustomGlueCatalog(name, properties, catalogConf);
+        return new IcebergGlueCatalog(name, properties, catalogConf);
     }
 
 }
