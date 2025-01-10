@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class IcebergCatalogs {
-
+/*
     List<IcebergGlueCatalog> catalogs;
 
     public IcebergCatalogs() {
@@ -39,5 +39,5 @@ public class IcebergCatalogs {
         }
 
         return sb.toString();
-    }
+    }*/
 }

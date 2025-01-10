@@ -36,7 +36,7 @@ public class IcebergCustomCatalogDeserializer extends StdDeserializer<IcebergGlu
             catalogConf.set(entry.getKey(), entry.getValue());
         }
 
-        return new IcebergGlueCatalog(name, properties, catalogConf);
+        return new IcebergGlueCatalog();
     }
 
 }

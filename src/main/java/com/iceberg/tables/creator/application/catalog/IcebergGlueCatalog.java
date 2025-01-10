@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 @JsonDeserialize(using = IcebergCustomCatalogDeserializer.class)
 public class IcebergGlueCatalog {
 
-	private String catalogName = "Glue_".concat((new Random()).toString());
+/*	private String catalogName = "Glue_".concat((new Random()).toString());
     private String metastoreUri;
     private Map<String, String> catalogProperties = new HashMap<>();
     private Configuration hadoopConfiguration = new Configuration();
@@ -71,6 +71,6 @@ public class IcebergGlueCatalog {
         sb.append("\n");
         return sb.toString();
     }
-    
+    */
     
 }

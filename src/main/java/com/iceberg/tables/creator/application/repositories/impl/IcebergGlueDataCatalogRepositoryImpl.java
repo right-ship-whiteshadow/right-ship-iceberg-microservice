@@ -19,6 +19,7 @@ import java.util.UUID;
 
 import org.apache.iceberg.*;
 import org.apache.iceberg.metrics.ScanMetrics;
+import org.springframework.beans.factory.annotation.Autowired;
 import software.amazon.awssdk.http.SdkHttpClient;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -95,39 +96,36 @@ public class IcebergGlueDataCatalogRepositoryImpl implements IcebergGlueDataCata
     private static org.apache.logging.log4j.Logger log = LogManager
             .getLogger(IcebergGlueDataCatalogRepositoryImpl.class);
 
-    public IcebergGlueDataCatalogRepositoryImpl(GlueClient glueClient, AWSCredentials awsCredentials) {
-        this.glueClient = glueClient;
+    public IcebergGlueDataCatalogRepositoryImpl(
+            GlueCatalog glueCatalog, GlueClient glueClient, AWSCredentials awsCredentials) {
         this.awsCredentials = awsCredentials;
+        this.glueCatalog = glueCatalog;
+        this.glueClient = glueClient;
     }
 
     @PostConstruct
     public void setUpIcebergRepository() {
-        if (awsCredentials != null) {
-            if (glueCatalog == null) {
-                glueCatalog = new GlueCatalog();
-            }
-            configuration = new Configuration();
-            configuration.set("fs.s3a.access.key", awsCredentials.getAwsClientAccessKey());
-            configuration.set("fs.s3a.secret.key", awsCredentials.getAwsClientSecretKey());
+        configuration = new Configuration();
+        configuration.set("fs.s3a.access.key", awsCredentials.getAwsClientAccessKey());
+        configuration.set("fs.s3a.secret.key", awsCredentials.getAwsClientSecretKey());
 
-            String endpoint = awsCredentials.getAwsEndPoint();
-            if (endpoint != null) {
-                configuration.set("fs.s3a.endpoint", endpoint);
-                configuration.set("fs.s3a.path.style.access", "true");
-            }
-
-            if (configuration.get(IO_MANIFEST_CACHE_ENABLED) == null) {
-                configuration.set(IO_MANIFEST_CACHE_ENABLED, IcebergTablesAWSGLueDataService.IO_MANIFEST_CACHE_ENABLED_DEFAULT);
-            }
-            if (configuration.get(IO_MANIFEST_CACHE_EXPIRATION_INTERVAL_MS) == null) {
-                configuration.set(IO_MANIFEST_CACHE_EXPIRATION_INTERVAL_MS,
-                        IcebergTablesAWSGLueDataService.IO_MANIFEST_CACHE_EXPIRATION_INTERVAL_MS_DEFAULT);
-            }
-            Map<String, String> properties = new HashMap<>();
-            properties.put("list-all-tables", "true");
-            glueCatalog.setConf(configuration);
-            glueCatalog.initialize(endpoint, properties);
+        String endpoint = awsCredentials.getAwsEndPoint();
+        if (endpoint != null) {
+            configuration.set("fs.s3a.endpoint", endpoint);
+            configuration.set("fs.s3a.path.style.access", "true");
         }
+
+        if (configuration.get(IO_MANIFEST_CACHE_ENABLED) == null) {
+            configuration.set(IO_MANIFEST_CACHE_ENABLED, IcebergTablesAWSGLueDataService.IO_MANIFEST_CACHE_ENABLED_DEFAULT);
+        }
+        if (configuration.get(IO_MANIFEST_CACHE_EXPIRATION_INTERVAL_MS) == null) {
+            configuration.set(IO_MANIFEST_CACHE_EXPIRATION_INTERVAL_MS,
+                    IcebergTablesAWSGLueDataService.IO_MANIFEST_CACHE_EXPIRATION_INTERVAL_MS_DEFAULT);
+        }
+        Map<String, String> properties = new HashMap<>();
+        properties.put("list-all-tables", "true");
+        glueCatalog.setConf(configuration);
+        glueCatalog.initialize(endpoint, properties);
     }
 
     public void setTableIdentifier(String namespace, String tableName) {
@@ -301,10 +299,10 @@ public class IcebergGlueDataCatalogRepositoryImpl implements IcebergGlueDataCata
             Class<?> pifClass = Class.forName("org.apache.iceberg.BaseTableScan");
             java.lang.reflect.Field pf = pifClass.getDeclaredField("scanMetrics");
             pf.setAccessible(true);
-            ScanMetrics metrics = (ScanMetrics)pf.get(scan);
+            ScanMetrics metrics = (ScanMetrics) pf.get(scan);
             long numSkipped = metrics.skippedDataFiles().value();
             long numScanned = metrics.resultDataFiles().value();
-            int pctSkipped = (int)(100*(numSkipped / (double)(numScanned + numSkipped)));
+            int pctSkipped = (int) (100 * (numSkipped / (double) (numScanned + numSkipped)));
             log.info("Skipped: " + numSkipped
                     + " Scanned: " + numScanned
                     + " Percent Skipped: " + pctSkipped);
@@ -528,7 +526,7 @@ public class IcebergGlueDataCatalogRepositoryImpl implements IcebergGlueDataCata
             return clientBuilder.build();
         };
 
-        return  new S3FileIO(supplier);
+        return new S3FileIO(supplier);
     }
 
     public boolean commitTable(String dataFiles) throws Exception {
@@ -629,24 +627,24 @@ public class IcebergGlueDataCatalogRepositoryImpl implements IcebergGlueDataCata
         PartitionSpec ps = icebergTable.spec();
         OutputFile outputFile = io.newOutputFile(filePath);
 
-        if(fileFormatStr == null) {
+        if (fileFormatStr == null) {
             // if file format is not provided, we'll try to infer from the file extension (if any)
             String fileLocation = outputFile.location();
-            if(fileLocation.contains("."))
+            if (fileLocation.contains("."))
                 fileFormatStr = fileLocation.substring(fileLocation.lastIndexOf('.') + 1, fileLocation.length());
             else
                 fileFormatStr = "";
         }
 
         FileFormat fileFormat = null;
-        if(fileFormatStr.isEmpty())
+        if (fileFormatStr.isEmpty())
             throw new Exception("Unable to infer the file format of the file to be committed: " + outputFile.location());
-        else if(fileFormatStr.toLowerCase().equals("parquet"))
+        else if (fileFormatStr.toLowerCase().equals("parquet"))
             fileFormat = FileFormat.PARQUET;
         else
             throw new Exception("Unsupported file format " + fileFormatStr + " cannot be committed: " + outputFile.location());
 
-        if(fileSize == null) {
+        if (fileSize == null) {
             try {
                 FileSystem fs = FileSystem.get(new URI(outputFile.location()), configuration);
                 FileStatus fstatus = fs.getFileStatus(new Path(outputFile.location()));
@@ -659,7 +657,7 @@ public class IcebergGlueDataCatalogRepositoryImpl implements IcebergGlueDataCata
         if (numRecords == null) {
             try {
                 Class<?> pifClass = Class.forName("org.apache.iceberg.parquet.ParquetIO");
-                Constructor<?> pifCstr =pifClass.getDeclaredConstructor();
+                Constructor<?> pifCstr = pifClass.getDeclaredConstructor();
                 pifCstr.setAccessible(true);
                 Object pifInst = pifCstr.newInstance();
                 Method pifMthd = pifClass.getDeclaredMethod("file", org.apache.iceberg.io.InputFile.class);
