@@ -32,7 +32,7 @@ public class IcebergTableAWSGlueDataEntity implements Serializable {
     private TableScan scan;
 
     public IcebergTableAWSGlueDataEntity() {
-    	if (glueCatalog == null) {
+    	/*if (glueCatalog == null) {
     		glueCatalog = new GlueCatalog();
 		}
 		Configuration conf = new Configuration();
@@ -56,7 +56,7 @@ public class IcebergTableAWSGlueDataEntity implements Serializable {
 		properties.put("list-all-tables", "true");
 		this.setConfiguration(conf);
 		catalog.setConf(conf);
-		catalog.initialize(endpoint, properties);
+		catalog.initialize(endpoint, properties);*/
     }
     
     private final static String iceberg_version = "2";

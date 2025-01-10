@@ -31,22 +31,7 @@ public class IcebergTableAWSGlueDataEntities {
     private static Logger log = LogManager.getLogger(IcebergTableAWSGlueDataEntities.class);
 
     public IcebergTableAWSGlueDataEntities() {
-    	if (credentials != null) {
-            conf.set("fs.s3a.access.key", credentials.getAwsClientAccessKey());
-            conf.set("fs.s3a.secret.key", credentials.getAwsClientSecretKey());
 
-            String endpoint = credentials.getAwsEndPoint();
-            if (endpoint != null) {
-                conf.set("fs.s3a.endpoint", endpoint);
-                conf.set("fs.s3a.path.style.access", "true");
-            }
-        }
-        if (conf.get(IO_MANIFEST_CACHE_ENABLED) == null) {
-            conf.set(IO_MANIFEST_CACHE_ENABLED, IO_MANIFEST_CACHE_ENABLED_DEFAULT);
-        }
-        if (conf.get(IO_MANIFEST_CACHE_EXPIRATION_INTERVAL_MS) == null) {
-            conf.set(IO_MANIFEST_CACHE_EXPIRATION_INTERVAL_MS, IO_MANIFEST_CACHE_EXPIRATION_INTERVAL_MS_DEFAULT);
-        }
     }
 
 	public Long getSnapshotId() {
@@ -65,7 +50,7 @@ public class IcebergTableAWSGlueDataEntities {
 		this.scanFilter = scanFilter;
 	}
 
-	public List<IcebergTableAWSGlueDataEntity> getIcebergUniversalTableEntities() {
+	/*public List<IcebergTableAWSGlueDataEntity> getIcebergUniversalTableEntities() {
 		return icebergUniversalTableEntities;
 	}
 
@@ -79,6 +64,6 @@ public class IcebergTableAWSGlueDataEntities {
 
 	public void setScan(TableScan scan) {
 		this.scan = scan;
-	}
+	}*/
 
 }

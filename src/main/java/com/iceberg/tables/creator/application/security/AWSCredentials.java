@@ -18,25 +18,26 @@ import jakarta.annotation.PostConstruct;
 public class AWSCredentials {
 
 	@Value("cloud.aws.credentials.access-key")
-    private String awsClientSecretKey;
+    private String awsClientSecretKey = "Test1";
 	
 	@Value("cloud.aws.credentials.secret-key")
-    private String awsClientAccessKey;
+    private String awsClientAccessKey = "Test2";
 	
 	@Value("cloud.aws.region.static")
-    private String awsRegion;
+    private String awsRegion = "eu-central-1";
 	
 	@Value("cloud.aws.session.token")
-    private String awsSessionToken;
+    private String awsSessionToken = "Token";
 	
 	@Value("cloud.aws.endpoint.url")
-    private String awsEndPoint;
+    private String awsEndPoint = "URL";
 	
 	private Map<String, String> awsCredentialsMap;
 	
 	@PostConstruct
 	public void initializeAwsCredentials() {
 		awsCredentialsMap = initializeCredentialsPropertiesMap();
+		//initializeAwsCredentialsInSystemVariables();
 	}
 
 	public String getAwsClientSecretKey() {
@@ -80,13 +81,17 @@ public class AWSCredentials {
 	}
 	
 	public Map<String, String> initializeCredentialsPropertiesMap() {
+		awsCredentialsMap = new HashMap<>();
 		awsCredentialsMap.put(IcebergConstants.awsAccessKeyId, awsClientAccessKey);
 		awsCredentialsMap.put(IcebergConstants.awsSecretAccessKey, awsClientSecretKey);
 		awsCredentialsMap.put(IcebergConstants.awsSessionToken, awsSessionToken);
 		awsCredentialsMap.put(IcebergConstants.awsAccessKeyIdSystemVariables, awsClientAccessKey);
 		awsCredentialsMap.put(IcebergConstants.awsSecretAccessKeySystemVariables, awsClientSecretKey);
 		awsCredentialsMap.put(IcebergConstants.awssessionTokenSystemVariables, awsSessionToken);
+		awsCredentialsMap.put(IcebergConstants.awsRegion, awsRegion);
+		awsCredentialsMap.put(IcebergConstants.awsDefaultRegion, awsRegion);
 		return awsCredentialsMap;
 	}
-    
+
+
 }

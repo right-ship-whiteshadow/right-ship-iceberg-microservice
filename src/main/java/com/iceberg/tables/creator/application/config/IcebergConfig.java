@@ -17,7 +17,11 @@ import software.amazon.awssdk.services.s3.S3Client;
 
 @Configuration
 public class IcebergConfig {
-	
+
+	static {
+		System.getProperties().put("aws.region", "eu-central-1");
+	}
+
 	@Bean
 	public AWSCredentials getAWSCredentials() {
 		return new AWSCredentials();
@@ -55,9 +59,8 @@ public class IcebergConfig {
 
 	@Bean
 	public S3Client getS3Client() {
-		return S3Client.builder()
+		return S3Client.builder().region(Region.EU_CENTRAL_1)
 				.credentialsProvider(getAwsCredentialsProvider())
 				.build();
 	}
-
 }

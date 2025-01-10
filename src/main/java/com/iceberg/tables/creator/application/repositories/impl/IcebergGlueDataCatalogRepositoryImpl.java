@@ -482,8 +482,8 @@ public class IcebergGlueDataCatalogRepositoryImpl implements IcebergGlueDataCata
             OutputFile location = io.newOutputFile(outputFile);
             System.out.println("New file created at: " + location);
 
-            appender = Parquet.write(location).schema(schema).createWriterFunc(GenericParquetWriter::buildWriter)
-                    .build();
+            /*appender = Parquet.write(location).schema(schema).createWriterFunc(GenericParquetWriter::buildWriter)
+                    .build();*/
             appender.addAll(builder.build());
         } finally {
             if (io != null)

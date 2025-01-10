@@ -8,6 +8,7 @@ public interface IcebergConstants {
 	String awsAccessKeyIdSystemVariables = "AWS_ACCESS_KEY_ID";
 	String awsSecretAccessKeySystemVariables = "AWS_SECRET_ACCESS_KEY"; 
 	String awssessionTokenSystemVariables = "AWS_SESSION_TOKEN"; 
-	
+	String awsDefaultRegion = "AWS_DEFAULT_REGION";
+	String awsRegion = "AWS_REGION";
 
 }
