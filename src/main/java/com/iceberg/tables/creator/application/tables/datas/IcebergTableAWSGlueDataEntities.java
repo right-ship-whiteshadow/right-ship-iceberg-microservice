@@ -24,9 +24,10 @@ public class IcebergTableAWSGlueDataEntities {
 
     private Long snapshotId;
     private String scanFilter;
-    private List<IcebergTableAWSGlueDataEntity> icebergUniversalTableEntities;
-    private TableScan scan;
-
+    //private List<IcebergTableAWSGlueDataEntity> icebergUniversalTableEntities;
+    
+    private IcebergTableAWSGlueDataEntity icebergTableAWSGlueDataEntity;
+    
     private static Logger log = LogManager.getLogger(IcebergTableAWSGlueDataEntities.class);
 
     public IcebergTableAWSGlueDataEntities() {
